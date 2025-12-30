@@ -2,7 +2,8 @@
 # Run as: powershell -ExecutionPolicy Bypass -File fix-all-mcp-servers.ps1
 
 $ErrorActionPreference = "Continue"
-$PYTHON = "C:\Users\Falco\AppData\Local\Programs\Python\Python313\python.exe"
+$PYTHON = (Get-Command python -ErrorAction SilentlyContinue).Source
+if (-not $PYTHON) { $PYTHON = "python" }
 
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host "MCP SERVER COMPLETE FIX SCRIPT" -ForegroundColor Cyan
@@ -24,7 +25,7 @@ foreach ($dep in $deps) {
 # ============================================
 Write-Host "`n[PHASE 2] Fixing AWS API MCP Server..." -ForegroundColor Yellow
 
-$AWS_SERVER = "C:\Users\Falco\AppData\Roaming\Claude\Claude Extensions\ant.dir.gh.awslabs.aws-api-mcp-server\server"
+$AWS_SERVER = "$env:APPDATA\Claude\Claude Extensions\ant.dir.gh.awslabs.aws-api-mcp-server\server"
 
 # Remove ALL bundled packages that have binary components or conflict with system packages
 $bundledToDisable = @(
@@ -52,7 +53,7 @@ foreach ($pkg in $bundledToDisable) {
 # ============================================
 Write-Host "`n[PHASE 3] Fixing Zscaler MCP Server..." -ForegroundColor Yellow
 
-$ZSCALER_SERVER = "C:\Users\Falco\AppData\Roaming\Claude\Claude Extensions\ant.dir.gh.zscaler.zscaler-mcp-server\server"
+$ZSCALER_SERVER = "$env:APPDATA\Claude\Claude Extensions\ant.dir.gh.zscaler.zscaler-mcp-server\server"
 
 # Create setup.py if not exists
 $setupPy = @"

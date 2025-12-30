@@ -1,69 +1,51 @@
 # MCP Server Complete Fix Script for Windows
 # Run as: powershell -ExecutionPolicy Bypass -File fix-all-mcp-servers.ps1
-# Updated: 2025-12-30
 
 $ErrorActionPreference = "Continue"
-$PYTHON = "C:\Users\Falco\AppData\Local\Programs\Python\Python313\python.exe"
+$PYTHON = (Get-Command python -ErrorAction SilentlyContinue).Source
+if (-not $PYTHON) { $PYTHON = "python" }
 
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host "MCP SERVER COMPLETE FIX SCRIPT" -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
 
 # ============================================
-# PHASE 1: Install ALL system Python dependencies
+# PHASE 1: Install missing system dependencies
 # ============================================
 Write-Host "`n[PHASE 1] Installing system Python dependencies..." -ForegroundColor Yellow
 
-$deps = @(
-    # Core system dependencies
-    "win32-setctime", "loguru", "colorama",
-    
-    # Packages with compiled binaries (need Windows versions)
-    "rpds-py", "pydantic-core", "pydantic", "pydantic-settings",
-    "orjson", "jiter", "charset-normalizer", "markupsafe",
-    "PyYAML", "websockets", "zstandard", "lazy-object-proxy",
-    "cffi", "cryptography", "python-box", "lxml",
-    
-    # MCP framework
-    "mcp", "fastmcp", "starlette", "uvicorn", "anyio",
-    "httpx", "httpx-sse", "httpcore", "sniffio", "h11", "sse-starlette",
-    
-    # Zscaler dependencies
-    "pycountry", "referencing", "jsonschema", "zscaler-sdk-python"
-)
-
-Write-Host "  Installing $($deps.Count) packages..." -ForegroundColor Gray
-& $PYTHON -m pip install $deps --break-system-packages --quiet 2>$null
-Write-Host "  System dependencies installed" -ForegroundColor Green
+$deps = @("win32-setctime", "loguru", "pydantic", "lxml", "cffi", "cryptography", "colorama")
+foreach ($dep in $deps) {
+    Write-Host "  Installing $dep..." -ForegroundColor Gray
+    & $PYTHON -m pip install --upgrade $dep --break-system-packages 2>$null
+}
 
 # ============================================
 # PHASE 2: Fix AWS API MCP Server
 # ============================================
 Write-Host "`n[PHASE 2] Fixing AWS API MCP Server..." -ForegroundColor Yellow
 
-$AWS_SERVER = "C:\Users\Falco\AppData\Roaming\Claude\Claude Extensions\ant.dir.gh.awslabs.aws-api-mcp-server\server"
+$AWS_SERVER = "$env:APPDATA\Claude\Claude Extensions\ant.dir.gh.awslabs.aws-api-mcp-server\server"
 
-if (Test-Path $AWS_SERVER) {
-    $bundledToDisable = @(
-        "loguru", "pydantic", "pydantic_core", "lxml", "rpds", "cffi", 
-        "cryptography", "referencing", "annotated_types"
-    )
+# Remove ALL bundled packages that have binary components or conflict with system packages
+$bundledToDisable = @(
+    "loguru", "pydantic", "pydantic_core", "lxml", "rpds", "cffi", 
+    "cryptography", "referencing", "annotated_types"
+)
 
-    foreach ($pkg in $bundledToDisable) {
-        $pkgPath = Join-Path $AWS_SERVER $pkg
-        $disabledPath = "$pkgPath.disabled"
-        
-        if (Test-Path $pkgPath) {
-            if (Test-Path $disabledPath) {
-                Remove-Item -Recurse -Force $disabledPath
-            }
-            Rename-Item $pkgPath $disabledPath -Force
-            Write-Host "  Disabled: $pkg" -ForegroundColor DarkGray
+foreach ($pkg in $bundledToDisable) {
+    $pkgPath = Join-Path $AWS_SERVER $pkg
+    $disabledPath = "$pkgPath.disabled"
+    
+    if (Test-Path $pkgPath) {
+        if (Test-Path $disabledPath) {
+            Remove-Item -Recurse -Force $disabledPath
         }
+        Rename-Item $pkgPath $disabledPath -Force
+        Write-Host "  Disabled bundled: $pkg" -ForegroundColor Green
+    } elseif (Test-Path $disabledPath) {
+        Write-Host "  Already disabled: $pkg" -ForegroundColor Gray
     }
-    Write-Host "  AWS API MCP Server fixed" -ForegroundColor Green
-} else {
-    Write-Host "  AWS API MCP Server not found, skipping" -ForegroundColor Yellow
 }
 
 # ============================================
@@ -71,59 +53,32 @@ if (Test-Path $AWS_SERVER) {
 # ============================================
 Write-Host "`n[PHASE 3] Fixing Zscaler MCP Server..." -ForegroundColor Yellow
 
-$ZSCALER_SERVER = "C:\Users\Falco\AppData\Roaming\Claude\Claude Extensions\ant.dir.gh.zscaler.zscaler-mcp-server\server"
-$ZSCALER_LIB = "$ZSCALER_SERVER\lib"
+$ZSCALER_SERVER = "$env:APPDATA\Claude\Claude Extensions\ant.dir.gh.zscaler.zscaler-mcp-server\server"
 
-if (Test-Path $ZSCALER_LIB) {
-    # Comprehensive list of packages to disable
-    $zscalerBundledToDisable = @(
-        # Packages with compiled binaries
-        "rpds*", "pydantic_core*", "orjson*", "jiter*", "charset_normalizer*",
-        "markupsafe*", "yaml*", "PyYAML*", "websockets*", "zstandard*",
-        "lazy_object_proxy*", "hf_xet*", "box*", "python_box*", "cffi*", "cryptography*",
-        
-        # Packages with version conflicts
-        "pydantic*", "pydantic_settings*",
-        
-        # MCP framework (use system versions)
-        "mcp*", "fastmcp*", "starlette*", "uvicorn*", "anyio*",
-        "httpx*", "httpcore*", "sniffio*", "h11*", "sse_starlette*"
-    )
-
-    foreach ($pattern in $zscalerBundledToDisable) {
-        Get-ChildItem -Path $ZSCALER_LIB -Directory -ErrorAction SilentlyContinue | 
-            Where-Object { $_.Name -like $pattern -and $_.Name -notlike "*.disabled" } | 
-            ForEach-Object {
-                $newName = "$($_.Name).disabled"
-                if (Test-Path "$ZSCALER_LIB\$newName") {
-                    Remove-Item -Path "$ZSCALER_LIB\$newName" -Recurse -Force -ErrorAction SilentlyContinue
-                }
-                Rename-Item -Path $_.FullName -NewName $newName -Force -ErrorAction SilentlyContinue
-                Write-Host "  Disabled: $($_.Name)" -ForegroundColor DarkGray
-            }
-    }
-
-    # Create setup.py if not exists
-    $setupPy = @"
+# Create setup.py if not exists
+$setupPy = @"
 from setuptools import setup, find_packages
 setup(
     name="zscaler_mcp",
     version="0.3.0",
     packages=find_packages(),
-    install_requires=["mcp", "httpx", "pydantic", "zscaler-sdk-python"],
+    install_requires=["mcp", "httpx", "pydantic"],
 )
 "@
-    $setupPath = Join-Path $ZSCALER_SERVER "setup.py"
-    if (-not (Test-Path $setupPath)) {
-        $setupPy | Out-File -FilePath $setupPath -Encoding UTF8
-        Write-Host "  Created setup.py" -ForegroundColor DarkGray
-    }
 
-    # Install in editable mode
-    & $PYTHON -m pip install -e $ZSCALER_SERVER --break-system-packages --quiet 2>$null
-    Write-Host "  Zscaler MCP Server fixed" -ForegroundColor Green
+$setupPath = Join-Path $ZSCALER_SERVER "setup.py"
+if (-not (Test-Path $setupPath)) {
+    $setupPy | Out-File -FilePath $setupPath -Encoding UTF8
+    Write-Host "  Created setup.py" -ForegroundColor Green
+}
+
+# Install in editable mode
+Write-Host "  Installing zscaler_mcp in editable mode..." -ForegroundColor Gray
+& $PYTHON -m pip install -e $ZSCALER_SERVER --break-system-packages 2>$null
+if ($LASTEXITCODE -eq 0) {
+    Write-Host "  Zscaler MCP installed successfully" -ForegroundColor Green
 } else {
-    Write-Host "  Zscaler MCP Server not found, skipping" -ForegroundColor Yellow
+    Write-Host "  Zscaler MCP install had warnings (may still work)" -ForegroundColor Yellow
 }
 
 # ============================================
@@ -131,40 +86,46 @@ setup(
 # ============================================
 Write-Host "`n[PHASE 4] Running verification tests..." -ForegroundColor Yellow
 
-$tests = @(
-    @{Name="win32_setctime"; Code="import win32_setctime"},
-    @{Name="loguru"; Code="from loguru import logger"},
-    @{Name="rpds"; Code="import rpds"},
-    @{Name="pydantic"; Code="import pydantic"},
-    @{Name="mcp"; Code="from mcp.server.fastmcp import FastMCP"},
-    @{Name="pycountry"; Code="import pycountry"},
-    @{Name="zscaler SDK"; Code="from zscaler import ZscalerClient"}
-)
-
-$passed = 0
-$failed = 0
-
-foreach ($test in $tests) {
-    $result = & $PYTHON -c $test.Code 2>&1
-    if ($LASTEXITCODE -eq 0) {
-        Write-Host "  $($test.Name): PASS" -ForegroundColor Green
-        $passed++
-    } else {
-        Write-Host "  $($test.Name): FAIL" -ForegroundColor Red
-        $failed++
-    }
-}
-
-# ============================================
-# Summary
-# ============================================
-Write-Host "`n========================================" -ForegroundColor Cyan
-Write-Host "SUMMARY" -ForegroundColor Cyan
-Write-Host "========================================" -ForegroundColor Cyan
-Write-Host "  Tests passed: $passed / $($tests.Count)" -ForegroundColor $(if ($failed -eq 0) { "Green" } else { "Yellow" })
-
-if ($failed -eq 0) {
-    Write-Host "`nSUCCESS! Please restart Claude Desktop to apply changes." -ForegroundColor Green
+# Test win32_setctime import
+Write-Host "  Testing win32_setctime import..." -ForegroundColor Gray
+$result = & $PYTHON -c "import win32_setctime; print('OK')" 2>&1
+if ($result -eq "OK") {
+    Write-Host "    win32_setctime: PASS" -ForegroundColor Green
 } else {
-    Write-Host "`nSome tests failed. Check errors above." -ForegroundColor Yellow
+    Write-Host "    win32_setctime: FAIL" -ForegroundColor Red
 }
+
+# Test loguru with file sink
+Write-Host "  Testing loguru with file sink..." -ForegroundColor Gray
+$result = & $PYTHON -c "from loguru import logger; logger.add('test.log'); logger.info('test'); print('OK')" 2>&1
+if ($result -match "OK") {
+    Write-Host "    loguru file sink: PASS" -ForegroundColor Green
+    Remove-Item "test.log" -ErrorAction SilentlyContinue
+} else {
+    Write-Host "    loguru file sink: FAIL - $result" -ForegroundColor Red
+}
+
+# Test AWS MCP Server import
+Write-Host "  Testing AWS API MCP Server import..." -ForegroundColor Gray
+$env:PYTHONPATH = $AWS_SERVER
+$result = & $PYTHON -c "from awslabs.aws_api_mcp_server import server; print('OK')" 2>&1
+if ($result -match "OK") {
+    Write-Host "    AWS API MCP Server: PASS" -ForegroundColor Green
+} else {
+    Write-Host "    AWS API MCP Server: FAIL" -ForegroundColor Red
+    Write-Host "    Error: $result" -ForegroundColor Red
+}
+
+# Test Zscaler MCP Server import
+Write-Host "  Testing Zscaler MCP Server import..." -ForegroundColor Gray
+$result = & $PYTHON -c "from zscaler_mcp import server; print('OK')" 2>&1
+if ($result -match "OK") {
+    Write-Host "    Zscaler MCP Server: PASS" -ForegroundColor Green
+} else {
+    Write-Host "    Zscaler MCP Server: FAIL" -ForegroundColor Red
+    Write-Host "    Error: $result" -ForegroundColor Red
+}
+
+Write-Host "`n========================================" -ForegroundColor Cyan
+Write-Host "FIX COMPLETE - Restart Claude Desktop" -ForegroundColor Cyan
+Write-Host "========================================" -ForegroundColor Cyan

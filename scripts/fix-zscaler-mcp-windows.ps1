@@ -12,9 +12,10 @@
 
 $ErrorActionPreference = "Continue"
 
-$serverDir = "C:\Users\Falco\AppData\Roaming\Claude\Claude Extensions\ant.dir.gh.zscaler.zscaler-mcp-server\server"
+$serverDir = "$env:APPDATA\Claude\Claude Extensions\ant.dir.gh.zscaler.zscaler-mcp-server\server"
 $libDir = "$serverDir\lib"
-$pythonExe = "C:\Users\Falco\AppData\Local\Programs\Python\Python313\python.exe"
+$pythonExe = (Get-Command python -ErrorAction SilentlyContinue).Source
+if (-not $pythonExe) { $pythonExe = "python" }
 
 Write-Host "=" * 80 -ForegroundColor Cyan
 Write-Host "ZSCALER MCP SERVER WINDOWS FIX" -ForegroundColor Cyan

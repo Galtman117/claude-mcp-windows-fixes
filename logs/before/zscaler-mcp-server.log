@@ -1,0 +1,11 @@
+# Zscaler MCP Server - Error Log (Before Fix)
+# Date: 2024-12-28 to 2024-12-29
+# Platform: Windows 11 Pro, Python 3.13
+
+2025-12-28T23:10:54.267Z [Zscaler MCP Server] [info] Server started and connected successfully { metadata: undefined }
+2025-12-28T23:10:54.344Z [Zscaler MCP Server] [info] Message from client: {"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"claude-ai","version":"0.1.0"}},"jsonrpc":"2.0","id":0} { metadata: undefined }
+C:\Users\Falco\AppData\Local\Programs\Python\Python313\python.exe: Error while finding module specification for 'zscaler_mcp.server' (ModuleNotFoundError: No module named 'zscaler_mcp')
+2025-12-28T23:10:54.356Z [Zscaler MCP Server] [info] Server transport closed { metadata: undefined }
+2025-12-28T23:10:54.356Z [Zscaler MCP Server] [info] Client transport closed { metadata: undefined }
+2025-12-28T23:10:54.356Z [Zscaler MCP Server] [info] Server transport closed unexpectedly, this is likely due to the process exiting early.
+2025-12-28T23:10:54.356Z [Zscaler MCP Server] [error] Server disconnected. For troubleshooting guidance, please visit our [debugging documentation](https://modelcontextprotocol.io/docs/tools/debugging) { metadata: { context: 'connection', stack: undefined } }
